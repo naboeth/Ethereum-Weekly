@@ -1,4 +1,4 @@
-Query "Gas Cost for Typical Actions at Recent Gas Prices"
+## Query "Gas Cost for Typical Actions at Recent Gas Prices"
 
 SELECT CASE WHEN '{{Gas Price}}'='Custom 👉' THEN '{{Gas Value Custom}} gwei'
     ELSE ROUND(percentile_cont(.5) within GROUP (ORDER BY gas_price)/1e9)  || ' gwei' END AS current_gas,
