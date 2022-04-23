@@ -11,3 +11,5 @@ The Ethereum weekly dashboard is aimed at Web3 users and crypto currency traders
 
 **How It's Made?** 
 We used the SQL querying provided by Dune Analytics to filter and visualize blockchain data. These queries were summarized in a Dune dashbard and supplemented by text boxes explaining the metrics.
+
+Project presentation: https://docs.google.com/presentation/d/1wpGhau9Q9YuuVC1xkqWbvFpMtibIk5GgS5vjIrV603E/edit?usp=sharing
