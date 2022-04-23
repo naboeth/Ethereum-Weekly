@@ -1,0 +1,184 @@
+Query "Gas Cost for Typical Actions at Recent Gas Prices"
+
+SELECT CASE WHEN '{{Gas Price}}'='Custom 👉' THEN '{{Gas Value Custom}} gwei'
+    ELSE ROUND(percentile_cont(.5) within GROUP (ORDER BY gas_price)/1e9)  || ' gwei' END AS current_gas,
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (21000*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 21000*gas_price))/1e18 END AS "ETH Transfer",
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN ROUND(AVG(price)*(21000*'{{Gas Value Custom}}')/1e9)
+    ELSE ROUND((AVG(price)*(percentile_cont(.5) within GROUP (ORDER BY 21000*gas_price))/1e18)::numeric, 2) END AS " ETH Transfer",
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (46580*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 46580*gas_price))/1e18 END AS "ERC20 Approval", -- Median gas used for ERC20 approval from: https://dune.xyz/queries/417874
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (47083*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 47083*gas_price))/1e18 END AS "ERC20 Transfer", -- Median gas used for ERC20 approval from: https://dune.xyz/queries/420183
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN ROUND(AVG(price)*(47083*'{{Gas Value Custom}}')/1e9)
+    ELSE ROUND((AVG(price)*(percentile_cont(.5) within GROUP (ORDER BY 47083*gas_price))/1e18)::numeric, 2) END AS " ERC20 Transfer",
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (49257*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 49257*gas_price))/1e18 END AS "ERC721 Approval", -- Median gas used for ERC721 approval from: https://dune.xyz/queries/420170
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (128287*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 128287*gas_price))/1e18 END AS "ERC721 Transfer", -- Median gas used for ERC721 transfer from: https://dune.xyz/queries/420173
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN ROUND(AVG(price)*(128287*'{{Gas Value Custom}}')/1e9)
+    ELSE ROUND((AVG(price)*(percentile_cont(.5) within GROUP (ORDER BY 128287*gas_price))/1e18)::numeric, 2) END AS " ERC721 Transfer",
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (46293*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 46293*gas_price))/1e18 END AS "ERC1155 Approval", -- Median gas used for ERC1155 approval from: https://dune.xyz/queries/420193
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (65028*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 65028*gas_price))/1e18 END AS "ERC1155 Transfer", -- Median gas used for ERC1155 transfer from: https://dune.xyz/queries/420200
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN ROUND(AVG(price)*(65028*'{{Gas Value Custom}}')/1e9)
+    ELSE ROUND((AVG(price)*(percentile_cont(.5) within GROUP (ORDER BY 65028*gas_price))/1e18)::numeric, 2) END AS " ERC1155 Transfer",
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (208042*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 208042*gas_price))/1e18 END AS "OpenSea Sale", -- Median gas used for OpenSea sale from: https://dune.xyz/queries/420201
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN ROUND(AVG(price)*(208042*'{{Gas Value Custom}}')/1e9)
+    ELSE ROUND((AVG(price)*(percentile_cont(.5) within GROUP (ORDER BY 208042*gas_price))/1e18)::numeric, 2) END AS " OpenSea Sale",
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (72087*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 72087*gas_price))/1e18 END AS "Hop ETH Away", -- Median gas used for Hop ETH away from: https://dune.xyz/queries/420203
+CASE WHEN '{{Gas Price}}'='Custom 👉' THEN (130647*'{{Gas Value Custom}}')/1e9
+    ELSE (percentile_cont(.5) within GROUP (ORDER BY 130647*gas_price))/1e18 END AS "Uniswap V3 Swap", -- Median gas used for Uniswap V3 swap from: https://dune.xyz/queries/420204
+ CASE WHEN '{{Gas Price}}'='Custom 👉' THEN ROUND(AVG(price)*(130647*'{{Gas Value Custom}}')/1e9)
+    ELSE ROUND((AVG(price)*(percentile_cont(.5) within GROUP (ORDER BY 130647*gas_price))/1e18)::numeric, 2) END AS " Uniswap V3 Swap"
+FROM ethereum.transactions, prices.layer1_usd
+WHERE block_time > NOW() - interval '10 minutes'
+AND symbol IN ('ETH', 'WETH')
+AND minute = (SELECT MAX(minute) FROM prices.layer1_usd WHERE symbol IN ('ETH', 'WETH'))
+
+
+Query "# of Transactions, by day"
+
+SELECT
+    DATE_TRUNC('day',block_time) AS dt
+    , COUNT(*) AS num_tx
+FROM ethereum.transactions
+WHERE
+    block_time >= (DATE_TRUNC('day',CURRENT_TIMESTAMP) - '7 days'::INTERVAL)
+    AND block_time < DATE_TRUNC('day',CURRENT_TIMESTAMP)
+GROUP BY 1
+ORDER BY 1;
+
+Query "Contract Deployment per Months"
+
+SELECT date_trunc('month', block_time),
+count(*),
+SUM(gas_used * (
+            SELECT AVG(p.price)
+            FROM prices.layer1_usd p
+            WHERE p.symbol = 'ETH'
+            AND p.minute = date_trunc('minute', t.block_time)
+            LIMIT 1
+        )*0.000000001)
+FROM ethereum.traces t
+WHERE block_time >= now()::date - interval '1 year'
+AND block_time < date_trunc('month', NOW())
+AND type='create'
+AND tx_success = true
+GROUP BY 1;
+
+Query "DEX 7 days volume"
+
+SELECT
+    SUM(usd_amount)/1e9 AS billion_volume
+FROM dex."trades" t                                                                             
+WHERE block_time > now() - interval '7 days'
+AND category = 'DEX'
+;
+
+Query "Number of Traders"
+
+WITH traders AS (
+
+  SELECT project, trader_a AS trader
+  FROM dex."trades"
+  WHERE block_time > now() - interval '7 days'
+  
+  UNION 
+  
+  SELECT project, trader_b AS trader
+  FROM dex."trades"
+  WHERE block_time > now() - interval '7 days'
+  
+)
+
+SELECT ROW_NUMBER () OVER (ORDER BY SUM(traders) DESC) AS "Rank", project AS "Project", SUM(traders) AS "Number of Traders" FROM
+(
+  SELECT project, COUNT(distinct trader) AS traders
+  FROM traders
+  GROUP BY 1
+) users
+GROUP BY 2
+ORDER BY 1 asc;
+
+Query "Market Share Dex by Volume"
+
+WITH seven_day_volume AS
+
+(
+    SELECT  project AS "Project",                        
+            SUM(usd_amount) as usd_volume                                                                             
+    FROM dex."trades" t                                                                             
+    WHERE block_time > now() - interval '7 days'
+    AND category = 'DEX'
+    GROUP BY 1
+
+), one_day_volume AS (
+    SELECT  project AS "Project",                        
+            SUM(usd_amount) as usd_volume                                                                             
+    FROM dex."trades" t                                                                             
+    WHERE block_time > now() - interval '1 days'
+    AND category = 'DEX'
+    GROUP BY 1
+)
+
+SELECT  ROW_NUMBER () OVER (ORDER BY SUM(seven.usd_volume) DESC) AS "Rank",
+        seven."Project",
+        SUM(seven.usd_volume) AS "7 Days Volume",
+        SUM(one.usd_volume) AS "24 Hours Volume"
+FROM  seven_day_volume seven
+LEFT JOIN one_day_volume one ON seven."Project" = one."Project"
+WHERE seven.usd_volume IS NOT NULL
+GROUP BY 2
+ORDER BY 3 DESC;
+
+
+Query "dydx users over time"
+
+ SELECT date, sum(users) OVER (
+                              ORDER BY date ASC ROWS BETWEEN unbounded preceding AND CURRENT ROW) AS total_users
+FROM
+  (SELECT date, count(USER) AS users
+   FROM
+     (SELECT min(date) AS date,
+             accountOwner AS USER
+      FROM
+        (SELECT date_trunc('day', evt_block_time) AS date,
+                maker AS accountOwner
+         FROM dydx_perpetual."PerpetualV1_evt_LogTrade"
+         UNION SELECT date_trunc('day', evt_block_time) AS date,
+                      taker AS accountOwner
+         FROM dydx_perpetual."PerpetualV1_evt_LogTrade"
+         UNION SELECT date_trunc('day', evt_block_time) AS date,
+                      "accountOwner" AS accountOwner
+         FROM dydx."SoloMargin_evt_LogDeposit"
+         UNION SELECT date_trunc('day', evt_block_time) AS date,
+                      "takerAccountOwner"
+         FROM dydx."SoloMargin_evt_LogTrade"
+         UNION SELECT date_trunc('day', evt_block_time) AS date,
+                      "makerAccountOwner"
+         FROM dydx."SoloMargin_evt_LogTrade"
+         UNION SELECT date_trunc('day', block_time),
+                      "from"
+         FROM dydx."PayableMarginMinter_call_mintMarginTokens" dydx
+         INNER JOIN ethereum."transactions" tx ON dydx.call_tx_hash = tx.hash
+         AND tx.block_time >= '2018-09-28'
+         AND call_success) AS table1
+      GROUP BY accountOwner) AS table2
+   GROUP BY date
+   ORDER BY date) AS table1
+   
+Query "dydx weekly volume"
+   
+   SELECT  project,                                                                                       
+        date_trunc('week', block_time),                                                                 
+        SUM(usd_amount) as usd_volume                                                                               
+FROM dex."trades" t                                                                                    
+WHERE block_time > date_trunc('day', now()) - interval '6 months'                                                          
+AND block_time < date_trunc('day', Now())
+AND category = 'DEX'
+AND project = 'dYdX'
+GROUP BY 1, 2;
